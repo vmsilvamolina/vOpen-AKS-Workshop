@@ -117,30 +117,30 @@ az aks get-versions -l $LOCATION --query 'orchestrators[-1].orchestratorVersion'
 
 ### Tarea 2: Despliegue del cluster de AKS
 
+1. Generar el recurso AKS (cluster):
 ```
 az aks create --resource-group $RG --name $CLUSTER_NAME --node-count $NODE_COUNT --kubernetes-version $KUBERNETESVERSION \
 --enable-addons monitoring,http_application_routing --generate-ssh-keys
 ```
-
+2. Obtener el ID del service principal:
 ```
 CLIENT_ID=$(az aks show --resource-group $RG --name $CLUSTER_NAME --query "servicePrincipalProfile.clientId" --output tsv)
 ```
+3. Obtener el id del registro ACR:
 ```
-# Get the ACR registry resource id
 ACR_ID=$(az acr show --name $ACR_NAME --resource-group $RG --query "id" --output tsv)
 ```
-
+4. Crear el rol en Azure (permisos de lectura) para el ACR:
 ```
-# Create role assignment
 az role assignment create --assignee $CLIENT_ID --role Reader --scope $ACR_ID
 ```
-
+5. Obtener info sobre la configuración del addon:
 ```
-# Show http application routing zone
 az aks show --resource-group $RG --name $CLUSTER_NAME --query addonProfiles.httpApplicationRouting.config.HTTPApplicationRoutingZoneName -o tsv
 ```
 
 ### Tarea 3: Configuación de Kubectl
+
 1. Configurar credenciales:
 ```
 az aks get-credentials --resource-group $RG --name $CLUSTER_NAME --file ~/.kube/config --overwrite-existing
@@ -153,6 +153,8 @@ kubectl get nodes
 ## Implementación de MongoDB
 
 Para la implementación de la base de datos en MongoDB vamos a utilizar **Helm**. Helm (del término marítimo de timón) es una herramienta para gestionar aplicaciones de Kubernetes. Helm te ayuda a dominar Kubernetes usando *cartas de navegación*, que en inglés se conocen como **Helm Charts**.
+
+![](images/helm.png)
 
 La principal función de Helm es definir, instalar y actualizar aplicaciones complejas de Kubernetes. Helm es mantenido por la CNCF en colaboración con Microsoft, Google, Bitnami y la comunidad de Helm.
 
@@ -205,7 +207,7 @@ kubectl create secret generic mongodb --from-literal=mongoHost="orders-mongo-mon
 
 ## Deploy de la API Order Capture
 
-En esta sección vamos a ver como desplegar una API desde la imagen `azch/captureorder`
+En esta sección vamos a ver como desplegar una API desde la imagen `azch/captureorder`.
 
 ### Tarea 1: 
 
@@ -270,7 +272,6 @@ kubectl apply -f captureorder-deployment.yaml
 3. Verificar que los pods están up y ejecutándose:
 ```
 kubectl get pods -l app=captureorder -w
-
 ```
 
 ### Tarea 2: Exponer la implementación `captureorder` como servicio
@@ -386,13 +387,18 @@ kubectl apply -f frontend-service.yaml
 
 ### Tarea 3: Implementar el ingress controller con Helm
 
+1. Actualizar ejecutando el siguiente comando:
+```
 helm repo update
-
+```
+2. Instalar el ingress:
+```
 helm upgrade --install ingress stable/nginx-ingress --namespace ingress
-
-Luego de unos minutos, ejecutar lo siguiente para obtener la IP pública:
-
+```
+3. Luego de unos minutos, ejecutar lo siguiente para obtener la IP pública:
+```
 kubectl get svc  -n ingress    ingress-nginx-ingress-controller -o jsonpath="{.status.loadBalancer.ingress[*].ip}"
+```
 
 ### Tarea 4: Ingress
 
@@ -412,8 +418,10 @@ spec:
           servicePort: 80
         path: /
 ```
+Donde se debe reemplazar `_INGRESS_CONTROLLER_EXTERNAL_IP_` con el valor obtenido en la tarea anterior.
+
 2. Luego ejecutar el comando siguiente:
 ```
 kubectl apply -f frontend-ingress.yaml
 ```
-3. Validar la implementación desde el navegador.
+3. Validar la implementación desde el navegador: http://frontend.\[cluster_specific_dns_zone\].
