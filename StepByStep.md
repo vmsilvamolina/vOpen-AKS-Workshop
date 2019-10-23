@@ -29,6 +29,11 @@
     - [Tarea 3: Implementar el ingress controller con Helm](#tarea-3-implementar-el-ingress-controller-con-helm)
     - [Tarea 4: Ingress](#tarea-4-ingress)
     - [Arquitectura](#arquitectura)
+  - [Habilitar SSL/TLS en el ingress](#habilitar-ssltls-en-el-ingress)
+    - [Tarea 1: Instalar `cert-manager`](#tarea-1-instalar-cert-manager)
+    - [Tarea 2: Crear un Let’s Encrypt ClusterIssuer](#tarea-2-crear-un-lets-encrypt-clusterissuer)
+    - [Tarea 3: Actualizar el ingress para solicitar el certificado automáticamente](#tarea-3-actualizar-el-ingress-para-solicitar-el-certificado-autom%c3%a1ticamente)
+    - [Tarea 4: Verificar el certificado](#tarea-4-verificar-el-certificado)
 <!-- /TOC -->
 
 
@@ -314,7 +319,7 @@ curl -d '{"EmailAddress": "email@domain.com", "Product": "prod-1", "Total": 100}
 
 ### Tarea 1: Deploy del Front End
 
-1. Generar el archivo `` para poder realizar el despliegue del Front end:
+1. Generar el archivo `captureorder-service.yaml` para poder realizar el despliegue del Front end:
 ```
 apiVersion: apps/v1
 kind: Deployment
@@ -425,8 +430,80 @@ Donde se debe reemplazar `_INGRESS_CONTROLLER_EXTERNAL_IP_` con el valor obtenid
 ```
 kubectl apply -f frontend-ingress.yaml
 ```
-3. Validar la implementación desde el navegador: http://frontend.\[cluster_specific_dns_zone\].
+3. Validar la implementación desde el navegador: http://frontend.[cluster_specific_dns_zone].
 
 ### Arquitectura
 
 ![](images/frontend.png)
+
+## Habilitar SSL/TLS en el ingress
+
+### Tarea 1: Instalar `cert-manager`
+
+1. Ejecutar el siguiente comando para instalar **cert-manager**:
+```
+helm install stable/cert-manager --name cert-manager --set ingressShim.defaultIssuerName=letsencrypt \
+--set ingressShim.defaultIssuerKind=ClusterIssuer --version v0.5.2
+```
+
+### Tarea 2: Crear un Let’s Encrypt ClusterIssuer
+
+1. Generar el archivo con el siguiente código:
+```
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory # production
+    #server: https://acme-staging-v02.api.letsencrypt.org/directory # staging
+    email: _YOUR_EMAIL_ # replace this with your email
+    privateKeySecretRef:
+      name: letsencrypt
+    http01: {}
+```
+Asegurarse de reemplazar `_YOUR_EMAIL_` con una dirección de correo válida.
+
+2. Aplicar la configuración anterior con el comando:
+```
+kubectl apply -f letsencrypt-clusterissuer.yaml
+```
+
+### Tarea 3: Actualizar el ingress para solicitar el certificado automáticamente
+
+1. Crear un archivo llamado `frontend-ingress-tls.yaml` con el siguiente código:
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: frontend
+  annotations:
+    certmanager.k8s.io/cluster-issuer: letsencrypt
+spec:
+  tls:
+  - hosts:
+    - frontend._INGRESS_CONTROLLER_EXTERNAL_IP_.nip.io
+    secretName: frontend-tls-secret
+  rules:
+  - host: frontend._INGRESS_CONTROLLER_EXTERNAL_IP_.nip.io
+    http:
+      paths:
+      - backend:
+          serviceName: frontend
+          servicePort: 80
+        path: /
+```
+Reemplazar con la IP externa del cluster el valor `_INGRESS_CONTROLLER_EXTERNAL_IP_`.
+
+2. Ejecutar el comando:
+```
+kubectl apply -f frontend-ingress-tls.yaml
+```
+
+### Tarea 4: Verificar el certificado
+
+1. Ejecutar:
+```
+kubectl describe certificate frontend
+```
