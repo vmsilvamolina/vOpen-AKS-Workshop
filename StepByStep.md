@@ -28,6 +28,7 @@
     - [Tarea 2: Exponer el Front End con un hostname](#tarea-2-exponer-el-front-end-con-un-hostname)
     - [Tarea 3: Implementar el ingress controller con Helm](#tarea-3-implementar-el-ingress-controller-con-helm)
     - [Tarea 4: Ingress](#tarea-4-ingress)
+    - [Arquitectura](#arquitectura)
 <!-- /TOC -->
 
 
@@ -425,3 +426,7 @@ Donde se debe reemplazar `_INGRESS_CONTROLLER_EXTERNAL_IP_` con el valor obtenid
 kubectl apply -f frontend-ingress.yaml
 ```
 3. Validar la implementación desde el navegador: http://frontend.\[cluster_specific_dns_zone\].
+
+### Arquitectura
+
+![](images/frontend.png)
